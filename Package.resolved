@@ -1,0 +1,24 @@
+{
+  "originHash" : "bc60ba98d078f371020bba5baddb403472a3f68b790b0410f70413e9e3a6fa08",
+  "pins" : [
+    {
+      "identity" : "ios_sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/adjust/ios_sdk.git",
+      "state" : {
+        "revision" : "e163732d55c3c0eb749f22418b6e4855839696c3",
+        "version" : "4.38.4"
+      }
+    },
+    {
+      "identity" : "pushwoosh-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Pushwoosh/Pushwoosh-XCFramework.git",
+      "state" : {
+        "revision" : "9f334c7d93bea67e8837ad5d150eaa25e9543d7e",
+        "version" : "6.7.15"
+      }
+    }
+  ],
+  "version" : 3
+}

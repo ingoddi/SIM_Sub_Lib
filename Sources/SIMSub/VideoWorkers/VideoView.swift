@@ -1,10 +1,19 @@
 import SwiftUI
 import AVKit
+import os
 
-// MARK: - Video Asset Queue Enum
+/// A logger for video-related operations in the VideoManager.
+@available(iOS 14.0, *)
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.example.app", category: "VideoManager")
+
+/// Defines dispatch queue priorities for loading video assets.
 public enum VideoAssetQueue {
-    case main, userInitiated, utility, background
+    case main
+    case userInitiated
+    case utility
+    case background
     
+    /// Returns the corresponding `DispatchQueue` for the queue type.
     var dispatchQueue: DispatchQueue {
         switch self {
         case .main: return .main
@@ -15,13 +24,20 @@ public enum VideoAssetQueue {
     }
 }
 
-// MARK: - VideoSimpleView
+/// A SwiftUI view that wraps an `AVPlayerViewController` to display a video.
+@available(iOS 14.0, *)
 public struct VideoSimpleView: UIViewControllerRepresentable {
     public let name: String
     public let gravity: AVLayerVideoGravity
     public let loop: Bool
     public let assetQueue: VideoAssetQueue
 
+    /// Initializes a `VideoSimpleView` with the specified video parameters.
+    /// - Parameters:
+    ///   - name: The name of the video file (without extension).
+    ///   - gravity: The video gravity for playback (e.g., `.resizeAspectFill`).
+    ///   - loop: Whether the video should loop. Defaults to `true`.
+    ///   - assetQueue: The dispatch queue for loading the video asset. Defaults to `.userInitiated`.
     public init(
         name: String,
         gravity: AVLayerVideoGravity,
@@ -34,6 +50,9 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
         self.assetQueue = assetQueue
     }
 
+    /// Creates and configures an `AVPlayerViewController` for video playback.
+    /// - Parameter context: The context provided by SwiftUI.
+    /// - Returns: A configured `AVPlayerViewController`.
     public func makeUIViewController(context: Context) -> AVPlayerViewController {
         let vc = AVPlayerViewController()
         vc.showsPlaybackControls = false
@@ -45,12 +64,16 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
             await VideoManager.shared.registerVideo(name: name, loop: loop, controller: vc, assetQueue: assetQueue)
             if let player = vc.player, player.currentItem?.status == .readyToPlay {
                 player.play()
-                print("Playing video on view controller creation: \(name)")
+                logger.info("Playing video on view controller creation: \(name)")
             }
         }
         return vc
     }
 
+    /// Updates the `AVPlayerViewController` with new properties if needed.
+    /// - Parameters:
+    ///   - vc: The `AVPlayerViewController` to update.
+    ///   - context: The context provided by SwiftUI.
     public func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
         if vc.videoGravity != gravity {
             vc.videoGravity = gravity
@@ -58,13 +81,20 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - VideoContainerViewRepresentable
+/// A SwiftUI view that wraps a `VideoSimpleContainerView` for custom video rendering.
+@available(iOS 14.0, *)
 public struct VideoContainerViewRepresentable: UIViewRepresentable {
     let videoName: String
     let gravity: AVLayerVideoGravity
     let cornerRadius: CGFloat
     let loop: Bool
     
+    /// Initializes a `VideoContainerViewRepresentable` with the specified video parameters.
+    /// - Parameters:
+    ///   - videoName: The name of the video file (without extension).
+    ///   - gravity: The video gravity for playback (e.g., `.resizeAspectFill`).
+    ///   - cornerRadius: The corner radius for the video view. Defaults to `0`.
+    ///   - loop: Whether the video should loop. Defaults to `true`.
     public init(videoName: String, gravity: AVLayerVideoGravity, cornerRadius: CGFloat = 0, loop: Bool = true) {
         self.videoName = videoName
         self.gravity = gravity
@@ -72,22 +102,32 @@ public struct VideoContainerViewRepresentable: UIViewRepresentable {
         self.loop = loop
     }
     
+    /// Creates a `VideoSimpleContainerView` for video playback.
+    /// - Parameter context: The context provided by SwiftUI.
+    /// - Returns: A configured `VideoSimpleContainerView`.
     public func makeUIView(context: Context) -> VideoSimpleContainerView {
         let view = VideoSimpleContainerView(cornerRadius: cornerRadius)
         view.setupVideo(name: videoName, gravity: gravity, loop: loop)
         return view
     }
     
+    /// Updates the `VideoSimpleContainerView` (currently a no-op).
+    /// - Parameters:
+    ///   - uiView: The `VideoSimpleContainerView` to update.
+    ///   - context: The context provided by SwiftUI.
     public func updateUIView(_ uiView: VideoSimpleContainerView, context: Context) {}
 }
 
-// MARK: - VideoSimpleContainerView
+/// A custom `UIView` for displaying videos with an `AVPlayerLayer`.
 @MainActor
+@available(iOS 14.0, *)
 public final class VideoSimpleContainerView: UIView {
     private let coordinator: VideoViewCoordinator
     private var playerLayer: AVPlayerLayer?
     private let radius: CGFloat
     
+    /// Initializes a `VideoSimpleContainerView` with a specified corner radius.
+    /// - Parameter cornerRadius: The corner radius for the video view.
     public init(cornerRadius: CGFloat) {
         self.radius = cornerRadius
         self.coordinator = VideoViewCoordinator()
@@ -98,6 +138,11 @@ public final class VideoSimpleContainerView: UIView {
     
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
+    /// Sets up the video with the specified parameters.
+    /// - Parameters:
+    ///   - name: The name of the video file (without extension).
+    ///   - gravity: The video gravity for playback (e.g., `.resizeAspectFill`).
+    ///   - loop: Whether the video should loop. Defaults to `true`.
     public func setupVideo(name: String, gravity: AVLayerVideoGravity, loop: Bool = true) {
         Task {
             await coordinator.setup(videoName: name, loop: loop)
@@ -108,11 +153,15 @@ public final class VideoSimpleContainerView: UIView {
         }
     }
     
+    /// Configures the `AVPlayerLayer` with the provided player and gravity.
+    /// - Parameters:
+    ///   - player: The `AVPlayer` to display.
+    ///   - gravity: The video gravity for playback.
     private func setPlayer(_ player: AVPlayer, gravity: AVLayerVideoGravity) {
         if let existingLayer = playerLayer {
             if existingLayer.player !== player {
                 existingLayer.player = player
-                print("Updated player for existing layer: \(String(describing: player.currentItem?.asset))")
+                logger.info("Updated player for existing layer: \(String(describing: player.currentItem?.asset))")
             }
             if existingLayer.videoGravity != gravity {
                 existingLayer.videoGravity = gravity
@@ -132,9 +181,10 @@ public final class VideoSimpleContainerView: UIView {
         CATransaction.commit()
         
         playerLayer = layer
-        print("Set new player layer for video: \(String(describing: player.currentItem?.asset))")
+        logger.info("Set new player layer for video: \(String(describing: player.currentItem?.asset))")
     }
     
+    /// Updates the layout of the `AVPlayerLayer` to match the view's bounds.
     public func updateLayout() {
         guard let playerLayer = playerLayer else { return }
         CATransaction.begin()
@@ -149,31 +199,39 @@ public final class VideoSimpleContainerView: UIView {
     }
 }
 
-// MARK: - VideoViewCoordinator
+/// Coordinates video playback and manages the `AVPlayer` instance.
 @MainActor
+@available(iOS 14.0, *)
 final class VideoViewCoordinator: ObservableObject, Hashable {
     private let id = UUID()
     private(set) var player: AVPlayer?
     private var currentVideoName: String?
     private var shouldLoop: Bool = true
     
+    /// Compares two coordinators for equality based on their IDs.
     nonisolated static func == (lhs: VideoViewCoordinator, rhs: VideoViewCoordinator) -> Bool {
         lhs.id == rhs.id
     }
     
+    /// Hashes the coordinator using its ID.
     nonisolated func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
     
+    /// Initializes a new `VideoViewCoordinator`.
     nonisolated init() {}
     
+    /// Sets up the video with the specified name and looping behavior.
+    /// - Parameters:
+    ///   - videoName: The name of the video file (without extension).
+    ///   - loop: Whether the video should loop. Defaults to `true`.
     func setup(videoName: String, loop: Bool = true) async {
         if currentVideoName == videoName && player != nil {
             if let player = player, player.currentItem?.status == .readyToPlay {
                 player.play()
-                print("Playing existing player for: \(videoName)")
+                logger.info("Playing existing player for: \(videoName)")
             } else {
-                print("Existing player for \(videoName) not ready")
+                logger.info("Existing player for \(videoName) not ready")
             }
             return
         }
@@ -185,63 +243,78 @@ final class VideoViewCoordinator: ObservableObject, Hashable {
         player = await VideoManager.shared.getPlayer(for: videoName, loop: loop)
         if let player = player, player.currentItem?.status == .readyToPlay {
             player.play()
-            print("Playing new player for: \(videoName)")
+            logger.info("Playing new player for: \(videoName)")
         }
     }
     
+    /// Starts video playback if the player is ready.
     func play() {
         if let player = player, player.currentItem?.status == .readyToPlay {
             player.play()
-            print("Coordinator play called for: \(String(describing: currentVideoName))")
+            logger.info("Coordinator play called for: \(String(describing: self.currentVideoName))")
         }
     }
     
+    /// Pauses video playback.
     func pause() {
         player?.pause()
-        print("Coordinator pause called for: \(String(describing: currentVideoName))")
+        logger.info("Coordinator pause called for: \(String(describing: self.currentVideoName))")
     }
     
+    /// Cleans up the coordinator by pausing and releasing the player.
     private func cleanup() {
         player?.pause()
         player = nil
         currentVideoName = nil
-        print("Coordinator cleaned up")
+        logger.info("Coordinator cleaned up")
     }
 }
 
-// MARK: - Sendable Observer Wrapper
+/// A `Sendable` wrapper for holding and removing notification observers.
 final class ObserverHolder: @unchecked Sendable {
     let observer: NSObjectProtocol
     let center: NotificationCenter
 
+    /// Initializes an `ObserverHolder` with the given observer and notification center.
+    /// - Parameters:
+    ///   - observer: The notification observer to hold.
+    ///   - center: The notification center managing the observer.
     init(observer: NSObjectProtocol, center: NotificationCenter) {
         self.observer = observer
         self.center = center
     }
 
+    /// Removes the held observer from the notification center.
     func remove() {
         center.removeObserver(observer)
     }
 }
 
-
+/// A `Sendable` struct for managing video loop observers.
+@available(iOS 14.0, *)
 struct LoopObserver: Sendable {
     private let id: String
     private let holder: ObserverHolder
 
+    /// Initializes a `LoopObserver` with the given ID and observer.
+    /// - Parameters:
+    ///   - id: The identifier for the observer (typically the video name).
+    ///   - observer: The notification observer to manage.
+    ///   - center: The notification center managing the observer. Defaults to `.default`.
     init(id: String, observer: NSObjectProtocol, center: NotificationCenter = .default) {
         self.id = id
         self.holder = ObserverHolder(observer: observer, center: center)
     }
 
+    /// Removes the observer from the notification center.
     func remove() {
         holder.remove()
     }
 }
 
-
-// MARK: - VideoManager
+/// Manages video playback, caching, and lifecycle events for the app.
 @MainActor
+@available(iOS 14.0, *)
 public final class VideoManager: NSObject {
     public static let shared = VideoManager()
     private var playerCache: [String: AVPlayer] = [:]
@@ -262,6 +335,7 @@ public final class VideoManager: NSObject {
         setupAppLifecycleObservers()
     }
     
+    /// Sets up observers for app lifecycle events (foreground, background, memory warnings).
     private func setupAppLifecycleObservers() {
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
@@ -271,8 +345,31 @@ public final class VideoManager: NSObject {
             Task { await self?.resumeAllVideos() }
         }
         
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { await self?.pauseAllVideos() }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.softClearCache()
+            }
+        }
     }
     
+    /// Registers a video to be played in an `AVPlayerViewController`.
+    /// - Parameters:
+    ///   - name: The name of the video file (without extension).
+    ///   - loop: Whether the video should loop.
+    ///   - controller: The `AVPlayerViewController` to display the video.
+    ///   - assetQueue: The dispatch queue for loading the video asset.
     public func registerVideo(name: String, loop: Bool, controller: AVPlayerViewController, assetQueue: VideoAssetQueue) async {
         activeControllers[name] = WeakRef(controller)
         let player = await getPlayer(for: name, loop: loop, assetQueue: assetQueue)
@@ -280,16 +377,16 @@ public final class VideoManager: NSObject {
         logPlayerState(player, name: name)
         if player.currentItem?.status == .readyToPlay {
             player.play()
-            print("Playing video in registerVideo: \(name)")
+            logger.info("Playing video in registerVideo: \(name)")
         } else {
             let observer = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
                 Task { @MainActor in
                     if item.status == .readyToPlay {
                         player.play()
-                        print("Playing video after ready in registerVideo: \(name)")
+                        logger.info("Playing video after ready in registerVideo: \(name)")
                         self?.playerItemObservers[name] = nil
                     } else if item.status == .failed {
-                        print("AVPlayerItem failed in registerVideo: \(name), error: \(String(describing: item.error))")
+                        logger.error("AVPlayerItem failed in registerVideo: \(name), error: \(String(describing: item.error))")
                         self?.playerItemObservers[name] = nil
                     }
                 }
@@ -300,20 +397,26 @@ public final class VideoManager: NSObject {
         }
     }
     
+    /// Retrieves or creates an `AVPlayer` for the specified video.
+    /// - Parameters:
+    ///   - name: The name of the video file (without extension).
+    ///   - loop: Whether the video should loop. Defaults to `true`.
+    ///   - assetQueue: The dispatch queue for loading the video asset. Defaults to `.userInitiated`.
+    /// - Returns: An `AVPlayer` configured for the video.
     public func getPlayer(for name: String, loop: Bool = true, assetQueue: VideoAssetQueue = .userInitiated) async -> AVPlayer {
         if let cachedPlayer = playerCache[name] {
             logPlayerState(cachedPlayer, name: name)
             if cachedPlayer.currentItem?.status == .readyToPlay {
                 cachedPlayer.play()
-                print("Returning cached player for: \(name)")
+                logger.info("Returning cached player for: \(name)")
             } else {
-                print("Cached player for \(name) not ready")
+                logger.info("Cached player for \(name) not ready")
             }
             return cachedPlayer
         }
         
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp4") else {
-            print("Video file not found: \(name)")
+            logger.error("Video file not found: \(name)")
             return AVPlayer()
         }
         
@@ -324,7 +427,7 @@ public final class VideoManager: NSObject {
             assetQueue.dispatchQueue.async {
                 asset.loadValuesAsynchronously(forKeys: keys) {
                     guard asset.statusOfValue(forKey: "playable", error: nil) == .loaded else {
-                        print("Failed to load asset for: \(name)")
+                        logger.error("Failed to load asset for: \(name)")
                         continuation.resume(returning: AVPlayer())
                         return
                     }
@@ -337,10 +440,10 @@ public final class VideoManager: NSObject {
                             Task { @MainActor in
                                 if item.status == .readyToPlay {
                                     player.play()
-                                    print("AVPlayerItem ready for playback: \(name)")
+                                    logger.info("AVPlayerItem ready for playback: \(name)")
                                     self?.playerItemObservers[name] = nil
                                 } else if item.status == .failed {
-                                    print("AVPlayerItem failed for: \(name), error: \(String(describing: item.error))")
+                                    logger.error("AVPlayerItem failed for: \(name), error: \(String(describing: item.error))")
                                     self?.playerItemObservers[name] = nil
                                 }
                             }
@@ -357,7 +460,7 @@ public final class VideoManager: NSObject {
                                     if let player = self?.playerCache[name] {
                                         player.seek(to: .zero)
                                         player.play()
-                                        print("Looping video in VideoManager: \(name)")
+                                        logger.info("Looping video in VideoManager: \(name)")
                                     }
                                 }
                             }
@@ -371,51 +474,59 @@ public final class VideoManager: NSObject {
         }
     }
     
+    /// Preloads videos to improve playback performance.
+    /// - Parameters:
+    ///   - names: An array of video file names to preload.
+    ///   - queue: The dispatch queue for preloading. Defaults to `.background`.
     public func preloadVideos(names: [String], queue: VideoAssetQueue = .background) {
         for name in names {
             if playerCache[name] == nil, preloadTasks[name] == nil {
                 preloadTasks[name] = Task {
                     let player = await self.getPlayer(for: name, loop: true, assetQueue: queue)
                     self.preloadTasks[name] = nil
-                    print("Preloaded video: \(name)")
+                    logger.info("Preloaded video: \(name)")
                     self.logPlayerState(player, name: name)
                 }
             }
         }
     }
     
+    /// Pauses all cached videos.
     private func pauseAllVideos() async {
         for (name, player) in playerCache {
-            print("Pausing video: \(name)")
+            logger.info("Pausing video: \(name)")
             player.pause()
         }
     }
     
+    /// Resumes playback for all active videos.
     private func resumeAllVideos() async {
         for (name, player) in playerCache {
             if let controller = activeControllers[name]?.value, controller.player == player, player.currentItem?.status == .readyToPlay {
-                print("Resuming video: \(name)")
+                logger.info("Resuming video: \(name)")
                 player.play()
             } else {
-                print("Not resuming video \(name): not displayed or not ready")
+                logger.info("Not resuming video \(name): not displayed or not ready")
             }
         }
     }
     
+    /// Clears all cached resources and observers.
     private func clearCache() {
         for (name, observer) in loopObservers {
             observer.remove()
-            print("Removed loop observer for: \(name)")
+            logger.info("Removed loop observer for: \(name)")
         }
         loopObservers.removeAll()
         playerCache.removeAll()
         activeControllers.removeAll()
         playerItemObservers.removeAll()
-        print("Cache cleared")
+        logger.info("Cache cleared")
     }
     
+    /// Clears cached resources for inactive videos in response to memory warnings.
     private func softClearCache() {
-        print("Received memory warning")
+        logger.info("Received memory warning")
         
         let activeNames = Set(activeControllers.keys)
         
@@ -425,39 +536,42 @@ public final class VideoManager: NSObject {
                 playerCache[name] = nil
                 loopObservers[name]?.remove()
                 loopObservers[name] = nil
-                print("Removed inactive video: \(name)")
+                logger.info("Removed inactive video: \(name)")
             }
         }
-        
     }
-
     
+    /// Logs the state of an `AVPlayer` for debugging.
+    /// - Parameters:
+    ///   - player: The `AVPlayer` to inspect.
+    ///   - name: The name of the video associated with the player.
     private func logPlayerState(_ player: AVPlayer, name: String) {
         if let item = player.currentItem {
             switch item.status {
             case .unknown:
-                print("Player state for \(name): Unknown")
+                logger.info("Player state for \(name): Unknown")
             case .readyToPlay:
-                print("Player state for \(name): Ready to play")
+                logger.info("Player state for \(name): Ready to play")
             case .failed:
-                print("Player state for \(name): Failed, error: \(String(describing: item.error))")
+                logger.error("Player state for \(name): Failed, error: \(String(describing: item.error))")
             @unknown default:
-                print("Player state for \(name): Unknown status")
+                logger.info("Player state for \(name): Unknown status")
             }
         } else {
-            print("Player state for \(name): No current item")
+            logger.info("Player state for \(name): No current item")
         }
     }
     
+    /// Cleans up all observers and resources.
     @MainActor
     private func cleanupObservers() {
         NotificationCenter.default.removeObserver(self)
         for (name, observer) in loopObservers {
             observer.remove()
-            print("Removed loop observer for: \(name)")
+            logger.info("Removed loop observer for: \(name)")
         }
         loopObservers.removeAll()
-        print("VideoManager deinit")
+        logger.info("VideoManager deinit")
     }
 
     deinit {

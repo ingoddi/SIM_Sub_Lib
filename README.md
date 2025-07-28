@@ -54,7 +54,7 @@ struct MyApp: App {
         productIds: DemoSubscriptionProduct.allCases.map { $0.productId }
     )
     @StateObject private var audioManager = AudioManagerService(
-        musicResourceName: "CelestialOdysseySpectralFluxRebirth",
+        musicResourceName: "musicFileName",
         formatMusic: .wav
     )
     @StateObject private var flow = OnboardingFlowModel(totalSteps: 3)

@@ -11,7 +11,7 @@ public struct RootScreen<
     @EnvironmentObject var subManager: SK2SubscriptionManager
     @EnvironmentObject var audioManager: AudioManagerService
     @Environment(\.scenePhase) private var scenePhase
-
+    
     let onboardingContainer: () -> OnboardingContainer
     
     let paywallScreen: (
@@ -44,72 +44,52 @@ public struct RootScreen<
         ZStack {
             if subManager.isSubscribed || subManager.isPaywallSkipped {
                 mainContent()
-            } else if showPaywall {
-                paywallScreen(
-                    subManager.products,
-                    { product in
-                        Task {
-                            await subManager.purchase(product)
-                            if subManager.isSubscribed { showPaywall = false }
-                        }
-                    },
-                    {
-                        Task {
-                            await subManager.restore()
-                            if subManager.isSubscribed { showPaywall = false }
-                        }
-                    },
-                    {
-                        showPaywall = false
-                        subManager.isPaywallSkipped = true
-                    }
-                )
             } else {
                 onboardingContainer()
                     .onOnboardingFinished {
-                        Task { @MainActor in
-                            showPaywall = true
+                        DispatchQueue.main.async {
+                            subManager.showSubscription = true
                         }
                     }
             }
-            
-            // ---- Paywall поверх Main ----
+
             if subManager.showSubscription {
                 paywallScreen(
                     subManager.products,
                     { product in
                         Task {
                             await subManager.purchase(product)
-                            subManager.showSubscription = false
+                            if subManager.isSubscribed {
+                                subManager.showSubscription = false
+                            }
                         }
                     },
                     {
                         Task {
                             await subManager.restore()
-                            subManager.showSubscription = false
+                            if subManager.isSubscribed {
+                                subManager.showSubscription = false
+                            }
                         }
                     },
                     {
+                        subManager.isPaywallSkipped = true
                         subManager.showSubscription = false
                     }
                 )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
+                .zIndex(1000)
+                .onAppear { audioManager.playbackStartet() }
+                .onDisappear { audioManager.playbackPauseу() }
             }
         }
-        .onChange(of: showPaywall) { _ in
-            updateAudioPlayback()
-        }
-        .onChange(of: subManager.isSubscribed) { _ in
-            updateAudioPlayback()
-        }
-        .onChange(of: subManager.isPaywallSkipped) { _ in
-            updateAudioPlayback()
-        }
-        .onChange(of: subManager.showSubscription) { _ in
-            updateAudioPlayback()
-        }
-        .onAppear {
-            updateAudioPlayback()
-        }
+        .animation(.easeInOut, value: subManager.showSubscription)
+        .onChange(of: subManager.isSubscribed) { _ in updateAudioPlayback() }
+        .onChange(of: subManager.isPaywallSkipped) { _ in updateAudioPlayback() }
+        .onAppear { updateAudioPlayback() }
         .onChange(of: scenePhase) { phase in
             switch phase {
             case .active, .inactive:
@@ -125,9 +105,6 @@ public struct RootScreen<
                 title: Text(alert.title),
                 message: Text(alert.message),
                 dismissButton: .default(Text("OK")) {
-                    if case .restoreSuccess = alert {
-                        showPaywall = false
-                    }
                     subManager.alert = nil
                 }
             )
@@ -135,6 +112,9 @@ public struct RootScreen<
     }
 
 
+
+    
+    
     private func updateAudioPlayback() {
         if subManager.isSubscribed || subManager.isPaywallSkipped {
             // Мы в Main
@@ -148,8 +128,8 @@ public struct RootScreen<
             audioManager.playbackStartet()
         }
     }
-
-
+    
+    
 }
 
 // MARK: - Onboarding Finished Environment

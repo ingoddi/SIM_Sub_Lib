@@ -2,6 +2,7 @@ import StoreKit
 import SwiftUI
 import Adjust
 import PushwooshFramework
+import Combine
 
 @available(iOS 15.0, *)
 @MainActor
@@ -18,7 +19,11 @@ public final class SK2SubscriptionManager: ObservableObject {
     private let productIds: [String]
     private var updatesTask: Task<Void, Never>?
     private var updateCheckTask: Task<Void, Never>?
-
+    private var productsLoadedSuccessfully = false
+    
+    private var cancellables: Set<AnyCancellable> = []
+    
+    
     public init(productIds: [String]) {
         self.productIds = productIds
         self.isSubscribed = UserDefaults.standard.bool(forKey: localKey)
@@ -26,26 +31,37 @@ public final class SK2SubscriptionManager: ObservableObject {
         Task { await self.loadProducts() }
         
         self.updatesTask = observeTransactions()
-        
         self.updateCheckTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
             await self?.validateWithServer()
         }
+        
+        NetworkMonitor.shared.$isConnected
+            .removeDuplicates()
+            .sink { [weak self] connected in
+                guard let self = self else { return }
+                if connected && !self.productsLoadedSuccessfully && self.products.isEmpty {
+                    Task { await self.loadProducts() }
+                }
+            }
+            .store(in: &cancellables)
     }
     
     deinit {
         updatesTask?.cancel()
         updateCheckTask?.cancel()
     }
-
+    
     public func loadProducts() async {
         do {
             self.products = try await Product.products(for: productIds)
+            self.productsLoadedSuccessfully = true
         } catch {
             self.error = error.localizedDescription
+            self.productsLoadedSuccessfully = false
         }
     }
-
+    
     /// Принимает не enum, а любой SubscriptionsProductProtocol!
     public func purchase(_ product: Product) async {
         guard let storeProduct = products.first(where: { $0.id == product.id }) else {
@@ -80,7 +96,7 @@ public final class SK2SubscriptionManager: ObservableObject {
             self.alert = .generalError(error.localizedDescription)
         }
     }
-
+    
     public func restore() async {
         self.isPurchasing = true
         self.error = ""

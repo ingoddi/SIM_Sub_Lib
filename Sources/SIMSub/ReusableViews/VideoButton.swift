@@ -6,17 +6,15 @@ public struct VideoButton: View {
     private let maskImageName: String?
     private let pressedImageName: String?
     private let action: () -> Void
-
+    
     private let width: CGFloat?
     private let height: CGFloat?
     private let expandHitAreaPercent: CGFloat
     private let showHitAreaDebug: Bool
-    private let cornerRadius: CGFloat
-    private let priority: CelestialVideoPriority
-
+    
     // MARK: - Состояние
     @State private var isPressed: Bool = false
-
+    
     // MARK: - Инициализация
     public init(
         videoName: String,
@@ -24,10 +22,8 @@ public struct VideoButton: View {
         pressedImageName: String? = nil,
         width: CGFloat? = nil,
         height: CGFloat? = nil,
-        cornerRadius: CGFloat = 0,
         expandHitAreaPercent: CGFloat = 0.1,
         showHitAreaDebug: Bool = false,
-        priority: CelestialVideoPriority = .button,
         action: @escaping () -> Void
     ) {
         self.videoName = videoName
@@ -35,19 +31,17 @@ public struct VideoButton: View {
         self.pressedImageName = pressedImageName
         self.width = width
         self.height = height
-        self.cornerRadius = cornerRadius
         self.expandHitAreaPercent = expandHitAreaPercent
         self.showHitAreaDebug = showHitAreaDebug
-        self.priority = priority
         self.action = action
     }
-
+    
     // MARK: - Body
     public var body: some View {
         GeometryReader { geo in
             let hitWidth = geo.size.width * (1 + expandHitAreaPercent * 2)
             let hitHeight = geo.size.height * (1 + expandHitAreaPercent * 2)
-
+            
             ZStack {
                 if isPressed, let pressedImageName = pressedImageName {
                     Image(pressedImageName)
@@ -56,14 +50,16 @@ public struct VideoButton: View {
                         .frame(width: geo.size.width, height: geo.size.height)
                         .applyMask(maskImageName)
                 } else {
-                    CelestialVideoView(
-                        name: videoName,
-                        cornerRadius: cornerRadius,
-                        gravity: .resizeAspectFill,
-                        priority: priority
-                    )
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .applyMask(maskImageName)
+                    if #available(iOS 14.0, *) {
+                        VideoSimpleView(
+                            name: videoName,
+                            gravity: .resizeAspectFill,
+                            loop: true,
+                            assetQueue: .main
+                        )
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .applyMask(maskImageName)
+                    }
                 }
             }
             .frame(width: width ?? geo.size.width, height: height ?? geo.size.height)

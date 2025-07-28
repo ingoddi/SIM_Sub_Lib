@@ -2,7 +2,7 @@
 
 # Onboarding and RootScreen Integration Guide
 
-This guide explains how to use the `RootScreen` view, set it up in your main `App` struct, and create an onboarding flow using the provided SwiftUI-based codebase. The code is designed to handle an onboarding experience with video playback, a subscription paywall, and a main content screen, as seen in the provided files (`RootScreen.swift`, `OnboardingSteps.swift`, `Onboarding.swift`, `SIM_Sub_LibApp.swift`, and `VideoView.swift`).
+This guide explains how to use the `RootScreen` view, set it up in your main `App` struct, and create an onboarding flow using the provided SwiftUI-based codebase. The code is designed to handle an onboarding experience with video playback, a subscription paywall, and a main content screen, as seen in the provided files (`RootScreen.swift`,  `VideoView.swift`).
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -20,8 +20,6 @@ This guide explains how to use the `RootScreen` view, set it up in your main `Ap
 The app uses a modular structure to manage an onboarding flow, subscription paywall, and main content screen. Key components include:
 
 - **`RootScreen`**: The top-level view that orchestrates the app’s flow, showing either the onboarding, paywall, or main content based on the user’s subscription status.
-- **`OnboardingContainer`**: Manages a sequence of onboarding screens with a sliding transition and a video-based navigation button.
-- **`OnboardingSteps`**: Individual screens (`Step1`, `Step2`, `Step3`) that display background videos and, in the case of `Step3`, interactive video grid items.
 - **`VideoView`**: Handles video playback and looping for onboarding screens and interactive elements.
 - **`SK2SubscriptionManager`**: Manages in-app subscriptions and paywall logic.
 - **`AudioManagerService`**: Controls background audio playback during onboarding and paywall screens.
@@ -357,28 +355,6 @@ public enum DemoSubscriptionProduct: String, CaseIterable, SubscriptionsProductP
 6. **Minimum iOS Version**:
    - The code requires iOS 15.0+ due to `RootScreen`’s availability annotation. For earlier versions, modify `RootScreen` to remove `@available(iOS 15.0, *)` and add compatibility checks.
    - `VideoLogger` handles iOS 13.0 compatibility by falling back to `print`.
-
-## Example Project Structure
-
-```plaintext
-MyApp/
-├── SIM_Sub_LibApp.swift
-├── RootScreen.swift
-├── Onboarding.swift
-├── OnboardingSteps.swift
-├── MainScreen.swift
-├── VideoView.swift
-├── Assets.xcassets/
-│   ├── EmpyreanChorusMysticSerenityQuest.mp4
-│   ├── NebularVoyageCelestialHarmonyPulse.mp4
-│   ├── TemporalCascadeLuminousShardOdyssey.mp4
-│   ├── AstralRadianceEternalEchoSymphony.mp4
-│   ├── ExcitedJumpPlay.mp4
-│   ├── CoverImage1.png
-│   ├── ButtonMask.png
-│   ├── pressed.png
-│   ├── CelestialOdysseySpectralFluxRebirth.wav
-```
 
 This README provides a comprehensive guide to using `RootScreen` and creating an onboarding flow. For further assistance, refer to the code comments in `VideoView.swift` for video playback details or contact the development team.
 

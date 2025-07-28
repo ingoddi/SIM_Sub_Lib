@@ -31,7 +31,7 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
     public let gravity: AVLayerVideoGravity
     public let loop: Bool
     public let assetQueue: VideoAssetQueue
-
+    
     /// Initializes a `VideoSimpleView` with the specified video parameters.
     /// - Parameters:
     ///   - name: The name of the video file (without extension).
@@ -49,7 +49,7 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
         self.loop = loop
         self.assetQueue = assetQueue
     }
-
+    
     /// Creates and configures an `AVPlayerViewController` for video playback.
     /// - Parameter context: The context provided by SwiftUI.
     /// - Returns: A configured `AVPlayerViewController`.
@@ -59,7 +59,7 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
         vc.videoGravity = gravity
         vc.view.backgroundColor = .clear
         vc.allowsPictureInPicturePlayback = false
-
+        
         Task {
             await VideoManager.shared.registerVideo(name: name, loop: loop, controller: vc, assetQueue: assetQueue)
             if let player = vc.player, player.currentItem?.status == .readyToPlay {
@@ -69,7 +69,7 @@ public struct VideoSimpleView: UIViewControllerRepresentable {
         }
         return vc
     }
-
+    
     /// Updates the `AVPlayerViewController` with new properties if needed.
     /// - Parameters:
     ///   - vc: The `AVPlayerViewController` to update.
@@ -274,7 +274,7 @@ final class VideoViewCoordinator: ObservableObject, Hashable {
 final class ObserverHolder: @unchecked Sendable {
     let observer: NSObjectProtocol
     let center: NotificationCenter
-
+    
     /// Initializes an `ObserverHolder` with the given observer and notification center.
     /// - Parameters:
     ///   - observer: The notification observer to hold.
@@ -283,7 +283,7 @@ final class ObserverHolder: @unchecked Sendable {
         self.observer = observer
         self.center = center
     }
-
+    
     /// Removes the held observer from the notification center.
     func remove() {
         center.removeObserver(observer)
@@ -295,7 +295,7 @@ final class ObserverHolder: @unchecked Sendable {
 struct LoopObserver: Sendable {
     private let id: String
     private let holder: ObserverHolder
-
+    
     /// Initializes a `LoopObserver` with the given ID and observer.
     /// - Parameters:
     ///   - id: The identifier for the observer (typically the video name).
@@ -305,7 +305,7 @@ struct LoopObserver: Sendable {
         self.id = id
         self.holder = ObserverHolder(observer: observer, center: center)
     }
-
+    
     /// Removes the observer from the notification center.
     func remove() {
         holder.remove()
@@ -361,6 +361,23 @@ public final class VideoManager: NSObject {
             Task { @MainActor in
                 self?.softClearCache()
             }
+        }
+    }
+    
+    /// Resumes a specific video by name if it's ready to play.
+    public func resumeVideo(name: String) async {
+        if let player = playerCache[name], player.currentItem?.status == .readyToPlay {
+            player.play()
+            logger.info("Resumed video: \(name)")
+        } else {
+            logger.info("Not resuming video \(name): not in cache or not ready")
+        }
+    }
+    
+    public func pauseVideo(name: String) async {
+        if let player = playerCache[name] {
+            player.pause()
+            logger.info("Paused video: \(name)")
         }
     }
     
@@ -492,7 +509,7 @@ public final class VideoManager: NSObject {
     }
     
     /// Pauses all cached videos.
-    private func pauseAllVideos() async {
+    public func pauseAllVideos() async {
         for (name, player) in playerCache {
             logger.info("Pausing video: \(name)")
             player.pause()
@@ -500,7 +517,7 @@ public final class VideoManager: NSObject {
     }
     
     /// Resumes playback for all active videos.
-    private func resumeAllVideos() async {
+    public func resumeAllVideos() async {
         for (name, player) in playerCache {
             if let controller = activeControllers[name]?.value, controller.player == player, player.currentItem?.status == .readyToPlay {
                 logger.info("Resuming video: \(name)")
@@ -512,7 +529,7 @@ public final class VideoManager: NSObject {
     }
     
     /// Clears all cached resources and observers.
-    private func clearCache() {
+    public func clearCache() {
         for (name, observer) in loopObservers {
             observer.remove()
             logger.info("Removed loop observer for: \(name)")
@@ -525,7 +542,7 @@ public final class VideoManager: NSObject {
     }
     
     /// Clears cached resources for inactive videos in response to memory warnings.
-    private func softClearCache() {
+    public func softClearCache() {
         logger.info("Received memory warning")
         
         let activeNames = Set(activeControllers.keys)
@@ -573,7 +590,7 @@ public final class VideoManager: NSObject {
         loopObservers.removeAll()
         logger.info("VideoManager deinit")
     }
-
+    
     deinit {
         DispatchQueue.main.async { [weak self] in
             self?.cleanupObservers()
